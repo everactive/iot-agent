@@ -1,0 +1,8 @@
+#!/bin/bash
+
+NATS_SNAPD_PASSWORD="$(snapctl get nats.snapd.password)"
+if [ ! -z "${NATS_SNAPD_PASSWORD}" ]; then
+  export IOTAGENT_NATS_SNAPD_PASSWORD="${NATS_SNAPD_PASSWORD}"
+fi
+
+$SNAP/bin/agent

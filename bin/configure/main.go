@@ -19,28 +19,8 @@
 
 package main
 
-import (
-	"flag"
-	"fmt"
-	"github.com/CanonicalLtd/iot-agent/config"
-	"os"
-)
+import "github.com/everactive/iot-agent/cmd"
 
 func main() {
-	var (
-		url       string
-		credsPath string
-	)
-	flag.StringVar(&url, "url", config.DefaultIdentityURL, "The URL of the Identity Service")
-	flag.StringVar(&credsPath, "path", config.GetPath(config.DefaultCredentialsPath), "The full path to the credentials file")
-	flag.Parse()
-
-	// Store the URL (let the other parameters be defaulted)
-	err := config.StoreParameters(config.Settings{
-		IdentityURL: url,
-	})
-	if err != nil {
-		fmt.Println("Error saving parameters:", err)
-		os.Exit(1)
-	}
+	_ = cmd.Configure.Execute()
 }

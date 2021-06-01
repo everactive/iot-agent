@@ -21,8 +21,24 @@ package config
 
 import (
 	"os"
+	"path"
 	"testing"
+
+	"github.com/snapcore/snapd/osutil"
 )
+
+func getExpectedCredentialsPath() string {
+	var expectedCredentialsPath string
+	if len(os.Getenv(paramsEnvVarOverride)) > 0 {
+		expectedCredentialsPath = path.Join(os.Getenv(paramsEnvVarOverride), "/current", DefaultCredentialsPath)
+	} else {
+		if len(os.Getenv(paramsEnvVar)) > 0 {
+			expectedCredentialsPath = path.Join(os.Getenv(paramsEnvVar), "../current", DefaultCredentialsPath)
+		}
+	}
+
+	return expectedCredentialsPath
+}
 
 func TestReadParameters(t *testing.T) {
 	tests := []struct {
@@ -33,15 +49,46 @@ func TestReadParameters(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			{
+				expectedCredentialsPath := getExpectedCredentialsPath()
 				got := ReadParameters()
 				if got.IdentityURL != DefaultIdentityURL {
 					t.Errorf("Config.ReadParameters() got = %v, want %v", got.IdentityURL, DefaultIdentityURL)
 				}
-				if got.CredentialsPath != DefaultCredentialsPath {
-					t.Errorf("Config.ReadParameters() got = %v, want %v", got.CredentialsPath, DefaultCredentialsPath)
+				if got.CredentialsPath != expectedCredentialsPath {
+					t.Errorf("Config.ReadParameters() got = %v, want %v", got.CredentialsPath, expectedCredentialsPath)
 				}
 
 				_ = os.Remove(paramsFilename)
+			}
+		})
+	}
+}
+
+func TestRemoveParameters(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    Settings
+		wantErr bool
+	}{
+		{"valid", Settings{}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expectedCredentialsPath := getExpectedCredentialsPath()
+			if err := StoreParameters(tt.args); (err != nil) != tt.wantErr {
+				t.Errorf("StoreParameters() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			got := RemoveParameters()
+			if got != nil {
+				t.Errorf("Config.RemoveParameters() got = %v, want %v", got, nil)
+			}
+
+			if osutil.FileExists(GetPath(paramsFilename)) {
+				t.Errorf("Config.RemoveParameters() params file still exists after remove")
+			}
+			if osutil.FileExists(GetPath(expectedCredentialsPath)) {
+				t.Errorf("Config.RemoveParameters() expectedCredentialsPath file still exists after remove")
 			}
 		})
 	}
@@ -57,6 +104,8 @@ func TestStoreParameters(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			expectedCredentialsPath := getExpectedCredentialsPath()
+
 			if err := StoreParameters(tt.args); (err != nil) != tt.wantErr {
 				t.Errorf("StoreParameters() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -65,8 +114,8 @@ func TestStoreParameters(t *testing.T) {
 			if got.IdentityURL != DefaultIdentityURL {
 				t.Errorf("Config.ReadParameters() got = %v, want %v", got.IdentityURL, DefaultIdentityURL)
 			}
-			if got.CredentialsPath != DefaultCredentialsPath {
-				t.Errorf("Config.ReadParameters() got = %v, want %v", got.CredentialsPath, DefaultCredentialsPath)
+			if got.CredentialsPath != expectedCredentialsPath {
+				t.Errorf("Config.ReadParameters() got = %v, want %v", got.CredentialsPath, expectedCredentialsPath)
 			}
 
 			_ = os.Remove(paramsFilename)

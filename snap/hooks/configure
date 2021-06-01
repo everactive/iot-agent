@@ -1,11 +1,35 @@
-#!/bin/sh
+#!/bin/bash
 
-# Get the parameters from the snap settings
-url=$(snapctl get url)
+handle_configure()
+{
+  # Get the parameters from the snap settings
+  url=$(snapctl get url)
 
-# Store the credentials
-cd $SNAP
-bin/configure -url $url
+  # Store the credentials
+  cd $SNAP
+  bin/configure --url $url
 
-# Restart the service
-snapctl restart ${SNAP_NAME}.mqtt
+  # Restart the service
+  snapctl restart ${SNAP_NAME}.agent
+}
+
+handle_nats_password()
+{
+    newpass=$(snapctl get nats.snapd.password)
+    if [ -z "${newpass}" ]; then
+        return
+    fi
+
+    oldhash=$(snapctl get private.nats.snapd.password.hash)
+    newhash=$(echo "${newpass}" | md5sum - | cut -d " " -f 1)
+    if [ "${newhash}" != "{$oldhash}" ]; then
+        # Update user password and hash in snap config
+        snapctl set nats.snapd.password="${newpass}"
+        snapctl set private.nats.snapd.password.hash="${newhash}"
+        
+        snapctl restart ${SNAP_NAME}.agent
+    fi
+}
+
+handle_nats_password
+handle_configure

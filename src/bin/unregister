@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run as root"
+   exit 1
+fi
+
+snapctl stop ${SNAP_NAME}.agent
+rm $SNAP_DATA/.secret
+rm $SNAP_DATA/params
+snapctl restart ${SNAP_NAME}.agent

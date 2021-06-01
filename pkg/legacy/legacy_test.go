@@ -16,17 +16,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-package mqtt
+package legacy
 
 import (
 	"encoding/json"
-	"github.com/CanonicalLtd/iot-agent/snapdapi"
-	twin "github.com/CanonicalLtd/iot-devicetwin/domain"
-	"github.com/CanonicalLtd/iot-identity/domain"
-	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"log"
 	"testing"
+
+	MQTT "github.com/eclipse/paho.mqtt.golang"
+	"github.com/everactive/iot-devicetwin/pkg/messages"
+	"github.com/everactive/iot-identity/domain"
+
+	"github.com/everactive/iot-agent/mqtt"
+	"github.com/everactive/iot-agent/snapdapi"
 )
 
 func TestConnection_Workflow(t *testing.T) {
@@ -65,6 +67,26 @@ func TestConnection_Workflow(t *testing.T) {
 	m12b := `{"id": "abc123", "action":"ack", "data":"invalid"}`
 	m13a := `{"id": "abc123", "action":"server"}`
 	m14a := `{"id": "abc123", "action":"device"}`
+	m15a := `{"id": "abc123", "action":"unregister"}`
+	m16a := `{"id": "abc123", "action":"switch", "snap":"helloworld", "data": "latest/stable"}`
+	m16b := `{"id": "abc123", "action":"switch", "snap":"helloworld", "data": ""}`
+	m16c := `{"id": "abc123", "action":"switch", "snap":"invalid", "data": ""}`
+
+	snapStartValid := `{"id": "abc123", "action":"start", "snap":"helloworld", "data":"{}"}`
+	snapStopValid := `{"id": "abc123", "action":"stop", "snap":"helloworld", "data":"{}"}`
+	snapRestartValid := `{"id": "abc123", "action":"stop", "snap":"helloworld", "data":"{}"}`
+
+	snapStartNoSnap := `{"id": "abc123", "action":"start", "snap":"", "data":"{}"}`
+	snapStopNoSnap := `{"id": "abc123", "action":"stop", "snap":"", "data":"{}"}`
+	snapRestartNoSnap := `{"id": "abc123", "action":"stop", "snap":"", "data":"{}"}`
+
+	snapStartValidMany := `{"id": "abc123", "action":"start", "snap":"helloworld", "data":"{\"services\":[\"helloworld.service1\",\"helloworld.service2\"]}"}`
+	snapStopValidMany := `{"id": "abc123", "action":"stop", "snap":"helloworld", "data":"{\"services\":[\"helloworld.service1\",\"helloworld.service2\"]}"}`
+	snapRestartValidMany := `{"id": "abc123", "action":"stop", "snap":"helloworld", "data":"{\"services\":[\"helloworld.service1\",\"helloworld.service2\"]}"}`
+
+	snapStartInvalidMany := `{"id": "abc123", "action":"start", "snap":"helloworld", "data":"{\"services\":[\"helloworld.service1\",\"jelloworld.service2\"]}"}`
+	snapStopInvalidMany := `{"id": "abc123", "action":"stop", "snap":"helloworld", "data":"{\"services\":[\"helloworld.service1\",\"jelloworld.service2\"]}"}`
+	snapRestartInvalidMany := `{"id": "abc123", "action":"stop", "snap":"helloworld", "data":"{\"services\":[\"helloworld.service1\",\"jelloworld.service2\"]}"}`
 
 	enroll := &domain.Enrollment{
 		Credentials: domain.Credentials{
@@ -72,7 +94,11 @@ func TestConnection_Workflow(t *testing.T) {
 			MQTTPort: "8883",
 		},
 	}
-	client = &MockClient{}
+	client := &MockClient{}
+
+	mqttConnection := mqtt.Connection{Client: client}
+	handler := New(&mqttConnection, enroll)
+
 	tests := []struct {
 		name     string
 		open     bool
@@ -133,27 +159,33 @@ func TestConnection_Workflow(t *testing.T) {
 
 		{"valid-deviceinfo", false, &MockMessage{[]byte(m14a)}, false, false, false},
 		{"snapd-error-deviceinfo", false, &MockMessage{[]byte(m14a)}, true, false, true},
+
+		{"valid-start", true, &MockMessage{[]byte(snapStartValid)}, false, false, false},
+		{"valid-stop", true, &MockMessage{[]byte(snapStopValid)}, false, false, false},
+		{"valid-restart", true, &MockMessage{[]byte(snapRestartValid)}, false, false, false},
+
+		{"invalid-start", true, &MockMessage{[]byte(snapStartNoSnap)}, false, false, true},
+		{"invalid-stop", true, &MockMessage{[]byte(snapStopNoSnap)}, false, false, true},
+		{"invalid-restart", true, &MockMessage{[]byte(snapRestartNoSnap)}, false, false, true},
+
+		{"valid-start-many", true, &MockMessage{[]byte(snapStartValidMany)}, false, false, false},
+		{"valid-stop-many", true, &MockMessage{[]byte(snapStopValidMany)}, false, false, false},
+		{"valid-restart-many", true, &MockMessage{[]byte(snapRestartValidMany)}, false, false, false},
+
+		{"invalid-start-many", true, &MockMessage{[]byte(snapStartInvalidMany)}, false, false, true},
+		{"invalid-stop-many", true, &MockMessage{[]byte(snapStopInvalidMany)}, false, false, true},
+		{"invalid-restart-many", true, &MockMessage{[]byte(snapRestartInvalidMany)}, false, false, true},
+
+		{"valid-unregister", false, &MockMessage{[]byte(m15a)}, false, false, false},
+		{"snapd-error-unregister", false, &MockMessage{[]byte(m15a)}, true, false, true},
+
+		{"valid-switch", true, &MockMessage{[]byte(m16a)}, false, false, false},
+		{"no-channel-switch", true, &MockMessage{[]byte(m16b)}, false, false, true},
+		{"invalid-switch", true, &MockMessage{[]byte(m16c)}, false, false, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapd = &snapdapi.MockClient{WithError: tt.snapdErr}
-			if tt.open {
-				client.Connect()
-			}
-			c, err := GetConnection(enroll)
-			if err != nil {
-				t.Error("TestConnection_Workflow: error creating connection")
-				return
-			}
-			if c.client == nil {
-				t.Error("TestConnection_Workflow: no client created")
-			}
-
-			// Publish the health
-			c.Health()
-
-			// Subscribe action
-			c.SubscribeHandler(client, tt.message)
+			MockSnapdClient(&snapdapi.MockClient{WithError: tt.snapdErr})
 
 			// Check again with the action
 			sa, err := deserializePayload(tt.message)
@@ -161,7 +193,7 @@ func TestConnection_Workflow(t *testing.T) {
 				t.Error("TestConnection_Workflow: payload - expected error got none")
 				return
 			}
-			resp, err := c.performAction(sa)
+			resp, err := handler.performAction(sa)
 			if err != nil && !tt.withErr {
 				t.Error("TestConnection_Workflow: action - expected error got none")
 				return
@@ -183,8 +215,8 @@ func TestConnection_Workflow(t *testing.T) {
 	}
 }
 
-func deserializePublishResponse(data []byte) (*twin.PublishResponse, error) {
-	s := twin.PublishResponse{}
+func deserializePublishResponse(data []byte) (*messages.PublishResponse, error) {
+	s := messages.PublishResponse{}
 
 	// Decode the message payload - the list of snaps
 	err := json.Unmarshal(data, &s)

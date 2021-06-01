@@ -25,13 +25,16 @@ import (
 	"log"
 	"os"
 	"path"
+
+	"github.com/snapcore/snapd/osutil"
 )
 
 // Default parameters
 const (
-	DefaultIdentityURL     = "http://localhost:8030/"
+	DefaultIdentityURL     = "http://localhost:8030"
 	DefaultCredentialsPath = ".secret"
 	paramsEnvVar           = "SNAP_DATA"
+	paramsEnvVarOverride   = "OVERRIDE_SNAP_DATA"
 	paramsFilename         = "params"
 )
 
@@ -41,12 +44,9 @@ type Settings struct {
 	CredentialsPath string `json:"path"`
 }
 
-// Config holds the config parameters for the application
-var Config Settings
-
 // ReadParameters fetches the store config parameters
 func ReadParameters() *Settings {
-	Config = Settings{
+	Config := Settings{
 		IdentityURL:     DefaultIdentityURL,
 		CredentialsPath: GetPath(DefaultCredentialsPath),
 	}
@@ -107,10 +107,31 @@ func StoreParameters(c Settings) error {
 	return os.Chmod(p, 0600)
 }
 
+// RemoveParameters removes the configuration parameters on the filesystem, effectively unregistering this device
+func RemoveParameters() error {
+	var err error = nil
+	if osutil.FileExists(GetPath(paramsFilename)) {
+		err = os.Remove(GetPath(paramsFilename))
+		if err != nil {
+			return err
+		}
+	}
+
+	if osutil.FileExists(GetPath(DefaultCredentialsPath)) {
+		err = os.Remove(GetPath(DefaultCredentialsPath))
+	}
+
+	return err
+}
+
 // GetPath returns the full path to the data file
 func GetPath(filename string) string {
-	if len(os.Getenv(paramsEnvVar)) > 0 {
-		return path.Join(os.Getenv(paramsEnvVar), "../current", filename)
+	if len(os.Getenv(paramsEnvVarOverride)) > 0 {
+		return path.Join(os.Getenv(paramsEnvVarOverride), "/current", filename)
+	} else {
+		if len(os.Getenv(paramsEnvVar)) > 0 {
+			return path.Join(os.Getenv(paramsEnvVar), "../current", filename)
+		}
 	}
 	return filename
 }

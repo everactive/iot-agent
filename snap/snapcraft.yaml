@@ -13,37 +13,40 @@ grade: stable
 base: core18
 
 apps:
-  mqtt:
-    command: agent
+  agent:
+    command: bin/launch_agent
     daemon: simple
     plugs:
       - network
       - network-bind
-      #- snapd-control    # it needs these privileged interfaces
-      #- shutdown         # but they trigger a manual store review
+      - snapd-control    # it needs these privileged interfaces
+      - shutdown         # but they trigger a manual store review
+  unregister:
+    command: bin/unregister
 
 parts:
-  go:
-    plugin: nil
-    source-tag: go1.12.1
-    source-depth: 1
-  client:
-    plugin: go
-    after: [go]
-    source: .
-    go-importpath: github.com/CanonicalLtd/iot-agent
-    override-build: |
-      export GOPATH=$(cd ../go && pwd)
-      GOBIN=$GOPATH/bin
-      PKG=github.com/CanonicalLtd/iot-agent
-      mkdir -p $GOBIN
-      cd $GOPATH/src/$PKG
-      ./get-deps.sh
-      go install ./...
+  src:
+    plugin: dump
+    source: src
 
-      mkdir -p $SNAPCRAFT_PART_INSTALL/bin
-      cp $GOBIN/agent $SNAPCRAFT_PART_INSTALL/bin/
-      cp $GOBIN/configure $SNAPCRAFT_PART_INSTALL/bin/
+  client:
+    plugin: nil
+    source: .
+    build-snaps:
+      - go/1.16/stable
+      - task
+    override-build: |
+      export GOPATH="$(go env GOPATH)"
+      export PATH="$PATH:$GOPATH/bin"
+      mkdir -p "$SNAPCRAFT_PART_INSTALL"/bin
+      go get -u github.com/everactive/generate/...
+      go build -o agent bin/agent/main.go
+      go build -o configure bin/configure/main.go
+      mv agent "$SNAPCRAFT_PART_INSTALL"/bin
+      mv configure "$SNAPCRAFT_PART_INSTALL"/bin
+    stage:
+      - bin/agent
+      - bin/configure
     build-packages:
       - git
       - gcc

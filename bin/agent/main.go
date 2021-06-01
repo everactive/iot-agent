@@ -19,31 +19,8 @@
 
 package main
 
-import (
-	"github.com/CanonicalLtd/iot-agent/config"
-	"os"
-	"testing"
-)
+import "github.com/everactive/iot-agent/cmd"
 
-func Test_main(t *testing.T) {
-	tests := []struct {
-		name string
-	}{
-		{"valid"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			main()
-
-			got := config.ReadParameters()
-			if got.IdentityURL != config.DefaultIdentityURL {
-				t.Errorf("Config.ReadParameters() got = %v, want %v", got.IdentityURL, config.DefaultIdentityURL)
-			}
-			if got.CredentialsPath != config.DefaultCredentialsPath {
-				t.Errorf("Config.ReadParameters() got = %v, want %v", got.CredentialsPath, config.DefaultCredentialsPath)
-			}
-
-			_ = os.Remove("params")
-		})
-	}
+func main() {
+	_ = cmd.Agent.Execute()
 }

@@ -1,0 +1,126 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "title": "iot-agent schema definitions for NATS API, includes snapd interface",
+  "description": "",
+  "definitions": {
+    "appInfo": {
+      "type": "object",
+      "properties": {
+        "name":        { "type":  "string" },
+        "daemon":      { "type": "string" },
+        "enabled":     { "type": "boolean" },
+        "active":      { "type": "boolean" }
+      }
+    },
+    "appsRequest": {
+      "type": "object",
+      "properties": {
+        "action": { "type":  "string" },
+        "names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "appsResponse": {
+      "type": "object",
+      "properties": {
+        "changeId":      { "type":  "string" },
+        "error":         { "type":  "string" }
+      }
+    },
+    "assertionsRequest": {
+      "type": "object",
+      "properties": {
+        "type": { "type":  "string" }
+      }
+    },
+    "assertionsResponse": {
+      "type": "object",
+      "properties": {
+        "stream": { "type":  "string" }
+      }
+    },
+    "errorInfo": {
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "mqttConnectionStatusRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {}
+    },
+    "mqttConnectionStatus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connected"
+      ],
+      "properties": {
+        "errorInfo": {
+          "$ref": "#/definitions/errorInfo"
+        },
+        "connected": {
+          "type": "boolean"
+        }
+    },
+    "asyncResponse": {
+      "type": "object",
+      "properties": {
+        "changeId":      { "type":  "string" },
+        "error":         { "type":  "string" }
+      }
+    },
+    "snap": {
+      "type": "object",
+      "properties": {
+        "id":                  { "type":  "string" },
+        "title":               { "type":  "string" },
+        "installedSize":       { "type":  "number", "format": "int64" },
+        "name":                { "type":  "string" },
+        "type":                { "type":  "string" },
+        "status":              { "type":  "string" },
+        "version":             { "type":  "string" },
+        "channel":             { "type":  "string" },
+        "trackingChannel":     { "type":  "string" },
+        "revision":            { "type":  "string" },
+        "installDate":         { "type":  "string", "format": "date-time" },
+        "apps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/appInfo"
+          }
+        }
+      }
+    },
+    "snapsResponse": {
+      "type": "object",
+      "properties": {
+        "snaps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/snap"
+          }
+        }
+      }
+    },
+    "snapsSnapRequest": {
+      "type": "object",
+      "properties": {
+        "action":                {
+          "type":  "string",
+          "enum": [ "switch" ]
+        },
+        "channel": {
+          "type":  "string",
+          "enum": [ "switch" ]
+        }
+      }
+    }
+  }
+}

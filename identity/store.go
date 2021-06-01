@@ -21,7 +21,7 @@ package identity
 
 import (
 	"encoding/json"
-	"github.com/CanonicalLtd/iot-identity/domain"
+	"github.com/everactive/iot-identity/domain"
 	"io/ioutil"
 )
 
@@ -38,6 +38,9 @@ func (srv *Service) storeCredentials(enroll domain.Enrollment) error {
 // getCredentials fetches the cached enrollment details
 func (srv *Service) getCredentials() (*domain.Enrollment, error) {
 	enroll := &domain.Enrollment{}
+
+	srv.settingsLock.Lock()
+	defer srv.settingsLock.Unlock()
 
 	// Read the credentials from the filesystem
 	data, err := ioutil.ReadFile(srv.Settings.CredentialsPath)

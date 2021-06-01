@@ -5,3 +5,6 @@ vendor/*/
 main
 .coverage/
 *.snap
+local-build-and-test.yml
+.netrc
+pkg/nats/mock_natsConnInterface.go

@@ -24,21 +24,64 @@ $ ./get-deps.sh
 $ go build ./...
 ```
 
-## Run
+## daemons
+### agent
+
+The agent runs as a simple daemon in the snap. It uses the snap config value `nats.snapd.password` to protect
+a partially implemented snapd NATS API that closely mirrors the snapd REST API. The details can be found in
+the AsyncAPI [here](./asyncapi.yaml).
+
+The NATS configuration currently needs to be setup separately on the server to support this.
+
+## apps
+
+### unregister
+
+unregister is a separate app in the snap that can be used to clear the configuration of the agent related
+to a Device Management Service it was previously registered/enrolled with. It will:
+
+* Stop the agent
+* Remove .secret
+* Remove params
+* Restart the agent
+
+## Encrypted `snapd` subject tree
+
+By default, the `snapd.>` subject tree is encrypted and only accessible with the correct username and password. By default (and with no snap configuration set) the password is `accept solve carbon atmosphere`. To change to a different password,
+
 ```bash
-go run cmd/agent/main.go -help
-  -credentials string
-        The full path to the credentials file (default ".secret")
-  -url string
-        The URL of the Identity Service (default "http://localhost:8030/")
+snap set everactive-iot-agent nats.snapd.password="a very long password indeed"
 ```
+Note that this password must match what is set in `everactive-nats`.
 
-## Contributing
-Before contributing you should sign [Canonical's contributor agreement](https://www.ubuntu.com/legal/contributors), it’s the easiest way for you to give us permission to use your contributions.
+## Unit Tests
 
-[travis-image]: https://travis-ci.org/CanonicalLtd/iot-agent.svg?branch=master
-[travis-url]: https://travis-ci.org/CanonicalLtd/iot-agent
-[goreportcard-image]: https://goreportcard.com/badge/github.com/CanonicalLtd/iot-agent
-[goreportcard-url]: https://goreportcard.com/report/github.com/CanonicalLtd/iot-agent
-[codecov-url]: https://codecov.io/gh/CanonicalLtd/iot-agent
-[codecov-image]: https://codecov.io/gh/CanonicalLtd/iot-agent/branch/master/graph/badge.svg
+Set `OVERRIDE_SNAP_DATA` and `OVERRIDE_SNAP_COMMON` to be values that are accessible / exists during testing. Make
+sure you export the full path ex. `/tmp/test-output`. `${OVERRIDE_SNAP_DATA/current}` also needs to exist prior
+to running tests.
+
+### Run single test
+
+`go test -v github.com/everactive/iot-agent/pkg/server -testify.m ^Test_NewServer$`
+
+
+## Tasks
+
+A top level Taskfile [taskfile.dev](https://taskfile.dev/#/) is included and drives common tasks. 
+
+### initialize
+
+If you haven't previously installed dependencies, this will install Mockery for you. It will then
+execute the prebuild task.
+
+### prebuild
+
+Will do all necessary pre-build tasks that are not one-time (like regenerating mocks). Regenerating messages
+structs is excluded do to manual editing necessary. See [generate-message-structs](#generate-message-structs) 
+for more information.
+
+### generate-message-structs
+
+NOTE: The current pkg/messages/messages.go has to be hand edited to perserve some types. If you regenerate the file you will need to diff it to identify types
+that are translated as string or float64 when their types are time.Time or int64. `import "time"` also needs to
+be preserved and the empty interface generated is meaningless and is dropped.
