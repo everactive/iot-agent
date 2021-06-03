@@ -22,18 +22,14 @@ package mqtt
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
-	twin "github.com/CanonicalLtd/iot-devicetwin/domain"
-	"github.com/CanonicalLtd/iot-identity/domain"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	"github.com/everactive/iot-identity/domain"
 	"log"
-	"time"
 )
 
 // Constants for connecting to the MQTT broker
 const (
-	quiesce        = 250
 	QOSAtMostOnce  = byte(0)
 	QOSAtLeastOnce = byte(1)
 	//QOSExactlyOnce = byte(2)
@@ -41,7 +37,7 @@ const (
 
 // Connection for MQTT protocol
 type Connection struct {
-	client         MQTT.Client
+	Client         MQTT.Client
 	clientID       string
 	organisationID string
 }
@@ -60,26 +56,23 @@ func GetConnection(enroll *domain.Enrollment) (*Connection, error) {
 
 		// Create a new connection
 		conn = &Connection{
-			client:         client,
+			Client:         client,
 			clientID:       enroll.ID,
 			organisationID: enroll.Organization.ID,
 		}
 	}
 
 	// Check that we have a live connection
-	if conn.client.IsConnectionOpen() {
+	if conn.Client.IsConnectionOpen() {
 		return conn, nil
 	}
 
 	// Connect to the MQTT broker
-	if token := conn.client.Connect(); token.Wait() && token.Error() != nil {
+	if token := conn.Client.Connect(); token.Wait() && token.Error() != nil {
 		return nil, token.Error()
 	}
 
-	// Subscribe to the actions topic
-	err := conn.SubscribeToActions()
-
-	return conn, err
+	return conn, nil
 }
 
 // newClient creates a new MQTT client
@@ -138,60 +131,4 @@ func newTLSConfig(enroll *domain.Enrollment) (*tls.Config, error) {
 		// Certificates = list of certs client sends to server.
 		Certificates: []tls.Certificate{cert},
 	}, nil
-}
-
-// SubscribeToActions subscribes to the action topic
-func (c *Connection) SubscribeToActions() error {
-	t := fmt.Sprintf("devices/sub/%s", c.clientID)
-	token := c.client.Subscribe(t, QOSAtLeastOnce, c.SubscribeHandler)
-	token.Wait()
-	if token.Error() != nil {
-		log.Printf("Error subscribing to topic `%s`: %v", t, token.Error())
-		return fmt.Errorf("error subscribing to topic `%s`: %v", t, token.Error())
-	}
-	return nil
-}
-
-// SubscribeHandler is the handler for the main subscription topic
-func (c *Connection) SubscribeHandler(client MQTT.Client, msg MQTT.Message) {
-	s, err := deserializePayload(msg)
-	if err != nil {
-		return
-	}
-
-	// The topic to publish the response to the specific action
-	t := fmt.Sprintf("devices/pub/%s", c.clientID)
-
-	// Perform the action
-	response, err := c.performAction(s)
-	if err != nil {
-		log.Printf("Error with action `%s`: %v", s.Action, err)
-	}
-
-	// Publish the response to the action to the broker
-	client.Publish(t, QOSAtLeastOnce, false, response)
-}
-
-// Health publishes a health message to indicate that the device is still active
-func (c *Connection) Health() {
-	// Serialize the device health details
-	h := twin.Health{
-		OrganizationID: c.organisationID,
-		DeviceID:       c.clientID,
-		Refresh:        time.Now(),
-	}
-	data, err := json.Marshal(&h)
-	if err != nil {
-		log.Printf("Error serializing the health data: %v", err)
-		return
-	}
-
-	// The topic to publish the response to the specific action
-	t := fmt.Sprintf("devices/health/%s", c.clientID)
-	c.client.Publish(t, QOSAtMostOnce, false, data)
-}
-
-// Close closes the connection to the MQTT broker
-func (c *Connection) Close() {
-	c.client.Disconnect(quiesce)
 }

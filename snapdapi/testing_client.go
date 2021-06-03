@@ -22,6 +22,11 @@ package snapdapi
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"strings"
+	"time"
+
 	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/client"
 )
@@ -82,6 +87,10 @@ Azds7xIR91OzXGFMx/PO7ZwflxBRIZw7+iFXEXWzfhzVlrUFDLr8K++g1g563UzY9P86XwGDlS7l
 // MockClient is a mock snapd API client for testing
 type MockClient struct {
 	WithError bool
+}
+
+func (c *MockClient) Snaps() ([]*client.Snap, error) {
+	panic("implement me")
 }
 
 // Snap mocks the details of a snap
@@ -179,7 +188,21 @@ func (c *MockClient) Ack(b []byte) error {
 
 // Known returns the known assertions for a given type
 func (c *MockClient) Known(assertTypeName string, headers map[string]string) ([]asserts.Assertion, error) {
-	panic("implement me")
+	if c.WithError {
+		return nil, fmt.Errorf("MOCK error known")
+	}
+
+	if assertTypeName == "model" {
+		return []asserts.Assertion{
+			&asserts.Model{},
+		}, nil
+	} else if assertTypeName == "serial" {
+		return []asserts.Assertion{
+			&asserts.Serial{},
+		}, nil
+	}
+
+	return []asserts.Assertion{}, nil
 }
 
 // Conf mocks returning config
@@ -198,8 +221,8 @@ func (c *MockClient) SetConf(name string, patch map[string]interface{}) (string,
 	return "106", nil
 }
 
-// GetEncodedAssertions returns the encoded model and serial assertions
-func (c *MockClient) GetEncodedAssertions() ([]byte, error) {
+// GetEncodedAssertions returns the encoded assertions by type
+func (c *MockClient) GetEncodedAssertions(assertionType string) ([]byte, error) {
 	if c.WithError {
 		return nil, fmt.Errorf("MOCK error known")
 	}
@@ -218,4 +241,50 @@ func (c *MockClient) DeviceInfo() (ActionDevice, error) {
 		DeviceKey:    "AAAAAAAAAA",
 		StoreID:      "example-store",
 	}, nil
+}
+
+func (c *MockClient) Apps(names []string, opts *client.AppOptions) ([]*client.AppInfo, error) {
+	return []*client.AppInfo{}, nil
+}
+
+func (c *MockClient) Start(names []string, opts client.StartOptions) (changeID string, err error) {
+	return "", nil
+}
+
+func (c *MockClient) Stop(names []string, opts client.StopOptions) (changeID string, err error) {
+	return "", nil
+}
+
+func (c *MockClient) Restart(names []string, opts client.RestartOptions) (changeID string, err error) {
+	return "", nil
+}
+
+func (c *MockClient) Switch(name string, opts *client.SnapOptions) (changeID string, err error) {
+	return "", nil
+}
+
+// Logs returns a mock channel of syslog logs from the snapd api
+func (c *MockClient) Logs(opts client.LogOptions) (<-chan client.Log, error) {
+	ch := make(chan client.Log)
+	emptyLog := client.Log{
+		Timestamp: time.Now(),
+		Message:   "",
+		SID:       "0",
+		PID:       "0",
+	}
+	go func() { ch <- emptyLog }()
+
+	return ch, nil
+
+}
+
+// SnapshotMany creates a mock setID for a snap snapshot
+func (c *MockClient) SnapshotMany(names []string, users []string) (setID uint64, changeID string, err error) {
+	return 1, "", nil
+}
+
+// SnapshotExport returns a mock archive data stream of a snapshot set
+func (c *MockClient) SnapshotExport(setID uint64) (stream io.ReadCloser, contentLength int64, err error) {
+	mockArchive := "mock archive stream"
+	return ioutil.NopCloser(strings.NewReader(mockArchive)), int64(len(mockArchive)), nil
 }

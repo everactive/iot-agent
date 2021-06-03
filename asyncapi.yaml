@@ -1,0 +1,122 @@
+asyncapi: 2.0.0
+info:
+  title:
+  version: '1'
+  description: |
+    This is the asynchronous API between the iot-agent and other snaps on the device. It includes a partial
+    snapd interface for authorized clients.
+
+channels:
+  v1.snapd.v2.assertions.get:
+    description: |
+      Reference: https://snapcraft.io/docs/snapd-api#heading--assertions for GET /v2/assertions/[assertionType]
+    publish:
+      message:
+        $ref: "#/components/messages/assertionsRequest"
+      x-responses:
+        $ref: "#/components/messages/assertionsResponse"
+
+  v1.snapd.v2.snaps.get:
+    description: |
+      Reference: https://snapcraft.io/docs/snapd-api#heading--snaps for GET /v2/snaps.
+    publish:
+      message:
+        $ref: "#/components/messages/snapsRequest"
+      x-responses:
+        $ref: "#/components/messages/snapsResponse"
+
+  v1.snapd.v2.apps.post:
+    description: |
+      Reference https://snapcraft.io/docs/snapd-api#heading--apps for POST /v2/apps.
+    publish:
+      message:
+        $ref: "#/components/messages/appsRequest"
+      x-responses:
+        $ref: "#/components/messages/appsResponse"
+
+  v1.snapd.v2.snaps.{snap}.post:
+    description: |
+      Reference: https://snapcraft.io/docs/snapd-api#heading--snaps for POST /v2/snaps/[name]. This currently only supports an action for switch.
+    publish:
+      message:
+        $ref: "#/components/messages/snapsSnapRequest"
+      x-responses:
+        $ref: "#/components/messages/snapsSnapResponse"
+    parameters:
+      snap:
+        $ref: "#/components/parameters/snap"
+        
+  iot.agent.mqtt.connection.status:
+    description: |
+      Request the current status of iot-agent's connection to the DMS mqtt server
+    publish:
+      message:
+        $ref:  "#/components/messages/iotagentmqttconnectionstatusrequest"
+      x-responses:
+        $ref:  "#/components/messages/iotagentmqttconnectionstatus"
+
+components:
+  messages:
+    appsRequest:
+      summary: |
+        Reference https://snapcraft.io/docs/snapd-api#heading--apps for POST /v2/apps
+      payload:
+        $ref: "./schemas/schemas.json#/definitions/appsRequest"
+
+    appsResponse:
+      summary: |
+        Reference https://snapcraft.io/docs/snapd-api#heading--apps for POST /v2/apps
+      payload:
+        $ref: "./schemas/schemas.json#/definitions/appsResponse"
+
+    assertionsRequest:
+      summary: |
+        Reference: https://snapcraft.io/docs/snapd-api#heading--assertions for GET /v2/assertions/[assertionType]
+      payload:
+        $ref: "./schemas/schemas.json#/definitions/assertionsRequest"
+
+    assertionsResponse:
+      summary: |
+        Reference: https://snapcraft.io/docs/snapd-api#heading--assertions for GET /v2/assertions/[assertionType]
+      payload:
+        $ref: "./schemas/schemas.json#/definitions/assertionsResponse"
+
+    iotagentmqttconnectionstatusrequest:
+      payload:
+        $ref:  "./schemas/schemas.json#/definitions/mqttConnectionStatusRequest"
+
+    iotagentmqttconnectionstatus:
+      payload:
+        $ref:  "./schemas/schemas.json#/definitions/mqttConnectionStatus"
+
+    snapsRequest:
+      summary: |
+        Reference: https://snapcraft.io/docs/snapd-api#heading--snaps for GET /v2/snaps.
+      payload:
+        $ref: "#/components/schemas/empty"
+
+    snapsResponse:
+      summary: |
+        Reference: https://snapcraft.io/docs/snapd-api#heading--snaps for GET /v2/snaps.
+      payload:
+        $ref: "./schemas/schemas.json#/definitions/snapsResponse"
+
+    snapsSnapRequest:
+      summary: |
+        Reference: https://snapcraft.io/docs/snapd-api#heading--snaps for POST /v2/snaps/[name].
+      payload:
+        $ref: "./schemas/schemas.json#/definitions/snapsSnapRequest"
+
+    snapsSnapResponse:
+      summary: |
+        Reference: https://snapcraft.io/docs/snapd-api#heading--snaps for POST /v2/snaps/[name].
+      payload:
+        $ref: "./schemas/schemas.json#/definitions/asyncResponse"
+
+  schemas:
+    empty:
+      type: object
+
+  parameters:
+    snap:
+      type: string

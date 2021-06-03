@@ -21,13 +21,13 @@ package identity
 
 import (
 	"fmt"
-	"github.com/CanonicalLtd/iot-agent/snapdapi"
-	"github.com/CanonicalLtd/iot-identity/web"
+	"github.com/everactive/iot-agent/snapdapi"
+	"github.com/everactive/iot-identity/web"
 	"os"
 	"strings"
 	"testing"
 
-	"github.com/CanonicalLtd/iot-agent/config"
+	"github.com/everactive/iot-agent/config"
 )
 
 func TestService_CheckEnrollment(t *testing.T) {
@@ -61,6 +61,7 @@ func TestService_CheckEnrollment(t *testing.T) {
 			snapd := &snapdapi.MockClient{WithError: tt.snapdErr}
 
 			srv := NewService(settings, snapd)
+
 			got, err := srv.CheckEnrollment()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Service.CheckEnrollment() error = %v, wantErr %v", err, tt.wantErr)

@@ -1,0 +1,60 @@
+  version: '3'
+
+  tasks:
+    initialize:
+      cmds:
+        - task: install-mockery
+        - task: prebuild
+    prebuild:
+      cmds:
+        - task: update-mocks
+    generate-message-structs:
+      desc: This will generate the Go structs from the schema definitions
+      cmds:
+        - mkdir -p pkg/messages
+        - schema-generate -o pkg/messages/messages.go -p messages ./schemas/schemas.json
+    install-mockery:
+      desc: Installs the mockery mock generating tool
+      cmds:
+        - go get github.com/vektra/mockery/.../
+    update-mocks:
+      desc: Updates / generates the mocks necessary for testing
+      cmds:
+        - mockery -dir pkg/legacy -all
+        - mockery -dir pkg/server -all
+        - mockery -dir identity -all
+        - mockery -dir snapdapi -all
+        - mockery -dir pkg/nats/ -name natsConnInterface -inpkg
+    test:
+      desc: Run tests for the iot agent
+      cmds:
+        - rm -rf current
+        - mkdir -p current
+        - |
+          export OVERRIDE_SNAP_COMMON=${PWD}
+          export OVERRIDE_SNAP_DATA=${PWD}
+          go test ./...
+    test-race:
+      desc: Run race detection tests
+      cmds:
+        - rm -rf current
+        - mkdir -p current
+        - |
+          export OVERRIDE_SNAP_COMMON=${PWD}
+          export OVERRIDE_SNAP_DATA=${PWD}
+          go test -count=1 -p 1 ./... -race
+    coverage:
+      desc: Generate a test coverage report
+      cmds:
+        - rm -rf current
+        - mkdir -p current
+        - |
+          export OVERRIDE_SNAP_COMMON=${PWD}
+          export OVERRIDE_SNAP_DATA=${PWD}
+          go test -coverprofile coverage_report $(go list ./... | grep -v vendor)
+          go tool cover -func=coverage_report
+
+    lint:
+      desc: Run the golangci-lint on the repo
+      cmds:
+        - golangci-lint run

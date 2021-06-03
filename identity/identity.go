@@ -24,23 +24,27 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/snapcore/snapd/asserts"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"sync"
 
-	"github.com/CanonicalLtd/iot-agent/config"
-	"github.com/CanonicalLtd/iot-agent/snapdapi"
-	"github.com/CanonicalLtd/iot-identity/domain"
-	"github.com/CanonicalLtd/iot-identity/web"
+	"github.com/everactive/iot-agent/config"
+	"github.com/everactive/iot-agent/snapdapi"
+	"github.com/everactive/iot-identity/domain"
+	"github.com/everactive/iot-identity/web"
 )
 
 // Default parameters
 const (
 	mediaType          = "application/x.ubuntu.assertion"
 	commonDataEnvVar   = "SNAP_COMMON"
+	overrideCommonDataEnvVar   = "OVERRIDE_SNAP_COMMON"
 	deviceDataFileName = "device-data.bin"
 )
 
@@ -53,6 +57,11 @@ type UseCase interface {
 type Service struct {
 	Settings *config.Settings
 	Snapd    snapdapi.SnapdClient
+	settingsLock sync.Mutex
+}
+
+type Identity interface {
+	CheckEnrollment() (*domain.Enrollment, error)
 }
 
 // NewService creates a new identity service connection
@@ -76,14 +85,39 @@ func (srv *Service) CheckEnrollment() (*domain.Enrollment, error) {
 	return srv.enrollDevice()
 }
 
+func (srv *Service) getEncodedAssertions() ([]byte, error) {
+	// Get the model assertion
+	modelAssertions, err := srv.Snapd.Known(asserts.ModelType.Name, map[string]string{})
+	if err != nil || len(modelAssertions) == 0 {
+		log.Printf("error retrieving the model assertion: %v", err)
+		return nil, err
+	}
+	dataModel := asserts.Encode(modelAssertions[0])
+
+	// Get the serial assertion
+	serialAssertions, err := srv.Snapd.Known(asserts.SerialType.Name, map[string]string{})
+	if err != nil || len(serialAssertions) == 0 {
+		log.Printf("error retrieving the serial assertion: %v", err)
+		return nil, err
+	}
+	dataSerial := asserts.Encode(serialAssertions[0])
+
+	// Bring the assertions together
+	data := append(dataModel, []byte("\n")...)
+	data = append(data, dataSerial...)
+	return data, nil
+}
+
 // enroll registers the device with the identity service
 func (srv *Service) enrollDevice() (*domain.Enrollment, error) {
 	// Get the model and serial assertions
-	data, err := srv.Snapd.GetEncodedAssertions()
+	data, err := srv.getEncodedAssertions()
 	if err != nil {
 		return nil, err
 	}
 
+	srv.settingsLock.Lock()
+	defer srv.settingsLock.Unlock()
 	// Format the URL for the identity service
 	resp, err := sendEnrollmentRequest(srv.Settings.IdentityURL, data)
 	if err != nil {
@@ -113,7 +147,12 @@ func storeDeviceData(dataBase64 string) error {
 		return fmt.Errorf("cannot decode device data: %v", err)
 	}
 
-	err = ioutil.WriteFile(path.Join(os.Getenv(commonDataEnvVar), deviceDataFileName), data, 0600)
+	dataPath := os.Getenv(commonDataEnvVar)
+	if len(os.Getenv(overrideCommonDataEnvVar)) > 0 {
+		dataPath = os.Getenv(overrideCommonDataEnvVar)
+	}
+
+	err = ioutil.WriteFile(path.Join(dataPath, deviceDataFileName), data, 0600)
 	if err != nil {
 		return fmt.Errorf("cannot write device data: %v", err)
 	}

@@ -20,6 +20,7 @@
 package snapdapi
 
 import (
+	"errors"
 	"log"
 
 	"github.com/snapcore/snapd/asserts"
@@ -35,7 +36,16 @@ type ActionDevice struct {
 }
 
 // GetEncodedAssertions fetches the encoded model and serial assertions
-func (a *ClientAdapter) GetEncodedAssertions() ([]byte, error) {
+func (a *ClientAdapter) GetEncodedAssertions(assertionType string) ([]byte, error) {
+	at := asserts.Type(assertionType)
+	if at == nil {
+		return nil, errors.New("unknown assertion type")
+	}
+
+	if at.Name != asserts.ModelType.Name {
+		return nil, errors.New("only model assertions are supported currently")
+	}
+
 	// Get the model assertion
 	modelAssertions, err := a.Known(asserts.ModelType.Name, map[string]string{})
 	if err != nil || len(modelAssertions) == 0 {
@@ -44,17 +54,7 @@ func (a *ClientAdapter) GetEncodedAssertions() ([]byte, error) {
 	}
 	dataModel := asserts.Encode(modelAssertions[0])
 
-	// Get the serial assertion
-	serialAssertions, err := a.Known(asserts.SerialType.Name, map[string]string{})
-	if err != nil || len(serialAssertions) == 0 {
-		log.Printf("error retrieving the serial assertion: %v", err)
-		return nil, err
-	}
-	dataSerial := asserts.Encode(serialAssertions[0])
-
-	// Bring the assertions together
 	data := append(dataModel, []byte("\n")...)
-	data = append(data, dataSerial...)
 	return data, nil
 }
 

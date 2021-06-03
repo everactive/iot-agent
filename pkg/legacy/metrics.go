@@ -17,40 +17,43 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package mqtt
+package legacy
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
-	"log"
+
+	"github.com/everactive/iot-agent/mqtt"
 )
 
 // Metrics publishes a metrics messages to indicate so the device can be monitored
-func (c *Connection) Metrics() {
+func (h *Handler) Metrics() {
 	// Publish the stats
-	c.memory()
-	c.cpu()
+	h.memory()
+	h.cpu()
 }
 
-func (c *Connection) publishMetrics(payload string) {
+func (h *Handler) publishMetrics(payload string) {
 	// The topic to publish the response to the specific action
-	t := fmt.Sprintf("metrics/%s", c.organisationID)
-	c.client.Publish(t, QOSAtMostOnce, false, []byte(payload))
+	t := fmt.Sprintf("metrics/%s", h.organizationID)
+	h.mqttConn.Client.Publish(t, mqtt.QOSAtMostOnce, false, []byte(payload))
 }
 
-func (c *Connection) memory() {
+func (h *Handler) memory() {
 	v, err := mem.VirtualMemory()
 	if err != nil {
 		log.Printf("Error getting memory usage: %v\n", err)
 		return
 	}
 
-	payload := fmt.Sprintf("memory,device=%s total=%d,used=%d,usedpc=%f", c.clientID, v.Total, v.Used, v.UsedPercent)
-	c.publishMetrics(payload)
+	payload := fmt.Sprintf("memory,device=%s total=%d,used=%d,usedpc=%f", h.clientID, v.Total, v.Used, v.UsedPercent)
+	h.publishMetrics(payload)
 }
 
-func (c *Connection) cpu() {
+func (h *Handler) cpu() {
 	vv, err := cpu.Times(false)
 	if err != nil {
 		log.Printf("Error getting cpu usage: %v\n", err)
@@ -64,6 +67,6 @@ func (c *Connection) cpu() {
 		total += v.Total()
 	}
 
-	payload := fmt.Sprintf("cpu,device=%s user=%f,system=%f,total=%f", c.clientID, user, system, total)
-	c.publishMetrics(payload)
+	payload := fmt.Sprintf("cpu,device=%s user=%f,system=%f,total=%f", h.clientID, user, system, total)
+	h.publishMetrics(payload)
 }

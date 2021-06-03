@@ -20,13 +20,19 @@
 package snapdapi
 
 import (
+	"io"
+	"sync"
+
 	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/client"
-	"sync"
 )
 
 // SnapdClient is a client of the snapd REST API
 type SnapdClient interface {
+	Apps(names []string, opts *client.AppOptions) ([]*client.AppInfo, error)
+	Start(names []string, opts client.StartOptions) (changeID string, err error)
+	Stop(names []string, opts client.StopOptions) (changeID string, err error)
+	Restart(names []string, opts client.RestartOptions) (changeID string, err error)
 	Snap(name string) (*client.Snap, *client.ResultInfo, error)
 	List(names []string, opts *client.ListOptions) ([]*client.Snap, error)
 	Install(name string, options *client.SnapOptions) (string, error)
@@ -40,9 +46,13 @@ type SnapdClient interface {
 	Known(assertTypeName string, headers map[string]string) ([]asserts.Assertion, error)
 	Conf(name string) (map[string]interface{}, error)
 	SetConf(name string, patch map[string]interface{}) (string, error)
-
-	GetEncodedAssertions() ([]byte, error)
+	GetEncodedAssertions(assertionType string) ([]byte, error)
 	DeviceInfo() (ActionDevice, error)
+	Snaps() ([]*client.Snap, error)
+	Switch(name string, options *client.SnapOptions) (string, error)
+	Logs(opts client.LogOptions) (<-chan client.Log, error)
+	SnapshotMany(names []string, users []string) (setID uint64, changeID string, err error)
+	SnapshotExport(setID uint64) (stream io.ReadCloser, contentLength int64, err error)
 }
 
 var clientOnce sync.Once
@@ -62,6 +72,22 @@ func NewClientAdapter() *ClientAdapter {
 	})
 
 	return clientInstance
+}
+
+func (a *ClientAdapter) Apps(names []string, opts *client.AppOptions) ([]*client.AppInfo, error) {
+	return a.snapdClient.Apps(names, *opts)
+}
+
+func (a *ClientAdapter) Start(names []string, opts client.StartOptions) (changeID string, err error) {
+	return a.snapdClient.Start(names, opts)
+}
+
+func (a *ClientAdapter) Stop(names []string, opts client.StopOptions) (changeID string, err error) {
+	return a.snapdClient.Stop(names, opts)
+}
+
+func (a *ClientAdapter) Restart(names []string, opts client.RestartOptions) (changeID string, err error) {
+	return a.snapdClient.Restart(names, opts)
 }
 
 // Snap returns the most recently published revision of the snap with the
@@ -120,7 +146,7 @@ func (a *ClientAdapter) Ack(b []byte) error {
 
 // Known queries assertions with type assertTypeName and matching assertion headers.
 func (a *ClientAdapter) Known(assertTypeName string, headers map[string]string) ([]asserts.Assertion, error) {
-	return a.snapdClient.Known(assertTypeName, headers)
+	return a.snapdClient.Known(assertTypeName, headers, nil)
 }
 
 // Conf gets the snap's current configuration
@@ -131,4 +157,28 @@ func (a *ClientAdapter) Conf(name string) (map[string]interface{}, error) {
 // SetConf requests a snap to apply the provided patch to the configuration
 func (a *ClientAdapter) SetConf(name string, patch map[string]interface{}) (string, error) {
 	return a.snapdClient.SetConf(name, patch)
+}
+
+func (a *ClientAdapter) Snaps() ([]*client.Snap, error) {
+	return a.snapdClient.List([]string{}, &client.ListOptions{All: true})
+}
+
+func (a *ClientAdapter) Switch(name string, options *client.SnapOptions) (string, error) {
+	return a.snapdClient.Switch(name, options)
+}
+
+// Logs requests syslog logs from the snapd api
+func (a *ClientAdapter) Logs(opts client.LogOptions) (<-chan client.Log, error) {
+	return a.snapdClient.Logs([]string{}, opts)
+}
+
+// SnapshotMany creates snapshots of the provided snaps under the provided users.
+// If an array is empty, it will take a snapshot of all snaps with users (or both)
+func (a *ClientAdapter) SnapshotMany(names []string, users []string) (setID uint64, changeID string, err error) {
+	return a.snapdClient.SnapshotMany(names, users)
+}
+
+// SnapshotExport returns an archive data stream of the Snapshot set created by the SnapshotMany function
+func (a *ClientAdapter) SnapshotExport(setID uint64) (stream io.ReadCloser, contentLength int64, err error) {
+	return a.snapdClient.SnapshotExport(setID)
 }
